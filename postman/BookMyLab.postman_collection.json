@@ -1,0 +1,233 @@
+{
+  "info": {
+    "name": "BookMyLab API",
+    "description": "Exp 2 (REST API + Postman) and Exp 8 (JWT). Run 'Login as Admin' first - its test script stores the token in {{adminToken}}. 'Login as Student' stores {{studentToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "adminToken", "value": "" },
+    { "key": "studentToken", "value": "" },
+    { "key": "equipmentId", "value": "1" },
+    { "key": "bookingId", "value": "1" },
+    { "key": "maintenanceId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth (JWT)",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const j = pm.response.json();",
+            "pm.test('token + ADMIN role', () => { pm.expect(j.token).to.be.a('string'); pm.expect(j.user.role).to.eql('ADMIN'); });",
+            "pm.collectionVariables.set('adminToken', j.token);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@bookmylab.com\",\n  \"password\": \"admin123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login" }
+        },
+        {
+          "name": "Login as Student",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const j = pm.response.json();",
+            "pm.test('STUDENT role', () => pm.expect(j.user.role).to.eql('STUDENT'));",
+            "pm.collectionVariables.set('studentToken', j.token);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"rahul@student.com\",\n  \"password\": \"student123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login" }
+        },
+        {
+          "name": "Register new student",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Student\",\n  \"email\": \"test{{$randomInt}}@student.com\",\n  \"password\": \"secret123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/register" }
+        },
+        {
+          "name": "Login with wrong password (expect 401)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@bookmylab.com\",\n  \"password\": \"wrong\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login" }
+        },
+        {
+          "name": "Current user (needs token)",
+          "request": { "method": "GET", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/auth/me" }
+        },
+        {
+          "name": "Protected route without token (expect 401)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/bookings" }
+        }
+      ]
+    },
+    {
+      "name": "2. Equipment CRUD",
+      "item": [
+        {
+          "name": "GET all equipment (public)",
+          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/equipment" }
+        },
+        {
+          "name": "GET one equipment",
+          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/equipment/{{equipmentId}}" }
+        },
+        {
+          "name": "GET equipment schedule",
+          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/equipment/{{equipmentId}}/schedule" }
+        },
+        {
+          "name": "POST create equipment (admin)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('equipmentId', pm.response.json().id);"
+          ] } }],
+          "request": { "method": "POST", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Logic Analyzer\",\n  \"category\": \"Electronics\",\n  \"quantity\": 3,\n  \"location\": \"Electronics Lab\",\n  \"condition\": \"Good\",\n  \"description\": \"8-channel USB logic analyzer\"\n}" },
+            "url": "{{baseUrl}}/api/equipment" }
+        },
+        {
+          "name": "PUT update equipment (admin)",
+          "request": { "method": "PUT", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Logic Analyzer\",\n  \"category\": \"Electronics\",\n  \"quantity\": 6,\n  \"location\": \"Electronics Lab\",\n  \"condition\": \"Good\",\n  \"description\": \"Quantity raised from 3 to 6\",\n  \"status\": \"AVAILABLE\"\n}" },
+            "url": "{{baseUrl}}/api/equipment/{{equipmentId}}" }
+        },
+        {
+          "name": "POST create equipment as STUDENT (expect 403)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }],
+          "request": { "method": "POST", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hack\",\n  \"category\": \"X\",\n  \"quantity\": 1,\n  \"location\": \"Y\"\n}" },
+            "url": "{{baseUrl}}/api/equipment" }
+        },
+        {
+          "name": "POST invalid equipment (expect 400)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('400 validation error', () => pm.response.to.have.status(400));"] } }],
+          "request": { "method": "POST", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"category\": \"Electronics\",\n  \"quantity\": 0,\n  \"location\": \"Lab\"\n}" },
+            "url": "{{baseUrl}}/api/equipment" }
+        },
+        {
+          "name": "DELETE equipment (admin) - run last",
+          "request": { "method": "DELETE", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/equipment/{{equipmentId}}" }
+        }
+      ]
+    },
+    {
+      "name": "3. Bookings",
+      "item": [
+        {
+          "name": "POST create booking (student)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const j = pm.response.json();",
+            "pm.test('starts as PENDING', () => pm.expect(j.status).to.eql('PENDING'));",
+            "pm.collectionVariables.set('bookingId', j.id);"
+          ] } }],
+          "request": { "method": "POST", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"equipmentId\": 4,\n  \"date\": \"2027-01-15\",\n  \"startTime\": \"10:00\",\n  \"endTime\": \"12:00\",\n  \"purpose\": \"Mini Project\"\n}" },
+            "url": "{{baseUrl}}/api/bookings" }
+        },
+        {
+          "name": "POST same slot again (expect 409 - double booking blocked)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+            "pm.test('message explains the clash', () => pm.expect(pm.response.json().message).to.include('already'));"
+          ] } }],
+          "request": { "method": "POST", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"equipmentId\": 4,\n  \"date\": \"2027-01-15\",\n  \"startTime\": \"11:00\",\n  \"endTime\": \"13:00\",\n  \"purpose\": \"Overlapping attempt\"\n}" },
+            "url": "{{baseUrl}}/api/bookings" }
+        },
+        {
+          "name": "GET my bookings (student) / all bookings (admin)",
+          "request": { "method": "GET", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/bookings" }
+        },
+        {
+          "name": "GET one booking",
+          "request": { "method": "GET", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}" }
+        },
+        {
+          "name": "PUT edit pending booking (student)",
+          "request": { "method": "PUT", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"equipmentId\": 4,\n  \"date\": \"2027-01-15\",\n  \"startTime\": \"14:00\",\n  \"endTime\": \"16:00\",\n  \"purpose\": \"Rescheduled\"\n}" },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}" }
+        },
+        {
+          "name": "PUT approve booking (admin)",
+          "request": { "method": "PUT", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ \"status\": \"APPROVED\" }" },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/status" }
+        },
+        {
+          "name": "PUT approve as STUDENT (expect 403)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] } }],
+          "request": { "method": "PUT", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ \"status\": \"APPROVED\" }" },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/status" }
+        },
+        {
+          "name": "PUT cancel booking (student)",
+          "request": { "method": "PUT", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/cancel" }
+        },
+        {
+          "name": "DELETE booking",
+          "request": { "method": "DELETE", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}" }
+        }
+      ]
+    },
+    {
+      "name": "4. Maintenance & Dashboards",
+      "item": [
+        {
+          "name": "POST log maintenance (admin)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('maintenanceId', pm.response.json().id);"] } }],
+          "request": { "method": "POST", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"equipmentId\": 5,\n  \"reason\": \"Firmware check\",\n  \"startDate\": \"2026-10-05\"\n}" },
+            "url": "{{baseUrl}}/api/maintenance" }
+        },
+        {
+          "name": "GET maintenance list (admin)",
+          "request": { "method": "GET", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/maintenance" }
+        },
+        {
+          "name": "PUT complete maintenance (admin)",
+          "request": { "method": "PUT", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/maintenance/{{maintenanceId}}/complete" }
+        },
+        {
+          "name": "GET admin dashboard",
+          "request": { "method": "GET", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/dashboard/admin" }
+        },
+        {
+          "name": "GET student dashboard",
+          "request": { "method": "GET", "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{studentToken}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/dashboard/student" }
+        },
+        {
+          "name": "GET Kotlin demo (Exp 5 + 6)",
+          "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/api/demo/kotlin" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+# Render Blueprint (Exp 9). Push the repo to GitHub, then: Render -> New -> Blueprint -> select the repo.
+services:
+  - type: web
+    name: bookmylab
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TZ
+        value: Asia/Kolkata

@@ -1,0 +1,5 @@
+**/node_modules
+**/target
+backend/data
+backend/src/main/resources/static
+.git
